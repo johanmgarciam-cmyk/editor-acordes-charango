@@ -1,63 +1,29 @@
 <script>
 
-// ============================
-// CONFIGURACIÓN BASE
-// ============================
-
 let activePositions = {};
 
-// ============================
-// BIBLIOTECA OFICIAL (EJEMPLO C MAYOR)
-// REEMPLAZAR CON LAS FORMAS EXACTAS DEL LIBRO
-// ============================
-
 const chordLibrary = {
-
   "C": {
     tipo: "Mayor",
     posiciones: [
-
       {
         numero: 1,
         inversion: "Fundamental",
         bajo: "C",
         shape: "0-0|1-0|2-0|3-3|4-0"
-      },
-
-      {
-        numero: 2,
-        inversion: "1ra inversión",
-        bajo: "E",
-        shape: "0-3|1-3|2-4|3-5|4-3"
-      },
-
-      {
-        numero: 3,
-        inversion: "2da inversión",
-        bajo: "G",
-        shape: "0-8|1-8|2-7|3-8|4-X"
-      },
-
-      {
-        numero: 4,
-        inversion: "Octava superior",
-        bajo: "C",
-        shape: "0-12|1-12|2-12|3-12|4-X"
       }
-
     ]
   }
-
 };
 
-// ============================
-// ACTIVAR TRATES
-// ============================
+// =======================
+// ACTIVAR TRASTES
+// =======================
 
 function toggleNote(string, fret, element){
 
-  // Limpiar esa cuerda
-  document.querySelectorAll(`.string-${string}`).forEach(el=>{
+  // Limpiar misma cuerda
+  document.querySelectorAll(`[data-string='${string}']`).forEach(el=>{
     el.classList.remove("active");
   });
 
@@ -67,32 +33,30 @@ function toggleNote(string, fret, element){
   validateChord();
 }
 
-// ============================
-// GENERAR CÓDIGO DE POSICIÓN
-// ============================
+// =======================
+// GENERAR CÓDIGO
+// =======================
 
 function generateShapeCode(){
 
   let code = [];
 
   for(let s=0; s<5; s++){
-
-    if(activePositions[s] !== undefined){
-      code.push(`${s}-${activePositions[s]}`);
-    } else {
-      code.push(`${s}-0`);
-    }
-
+    let fret = activePositions[s] ?? 0;
+    code.push(`${s}-${fret}`);
   }
 
   return code.join("|");
 }
 
-// ============================
-// VALIDAR CONTRA BIBLIOTECA
-// ============================
+// =======================
+// VALIDAR
+// =======================
 
 function validateChord(){
+
+  const resultDiv = document.getElementById("result");
+  if(!resultDiv) return;
 
   const currentShape = generateShapeCode();
 
@@ -104,30 +68,25 @@ function validateChord(){
 
       if(currentShape === pos.shape){
 
-        document.getElementById("result").innerHTML = `
+        resultDiv.innerHTML = `
           <b>Acorde:</b> ${chordName} ${chord.tipo}<br>
           <b>Posición:</b> ${pos.numero}<br>
-          <b>Inversión:</b> ${pos.inversion}<br>
-          <b>Bajo:</b> ${pos.bajo}
+          <b>Inversión:</b> ${pos.inversion}
         `;
-
         return;
       }
     }
   }
 
-  document.getElementById("result").innerHTML =
-    "No corresponde a biblioteca oficial";
-
+  resultDiv.innerHTML = "No corresponde a biblioteca oficial";
 }
 
-// ============================
+// =======================
 // SONIDO
-// ============================
+// =======================
 
 const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-
-const tuning = [7,0,4,9,4]; // G C E A E
+const tuning = [7,0,4,9,4];
 
 function getFrequency(noteIndex){
   return 440 * Math.pow(2, (noteIndex - 9)/12);
