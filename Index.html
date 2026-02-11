@@ -1,127 +1,64 @@
-<script>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editor de Acordes Charango</title>
 
-console.log("Editor cargado correctamente");
-
-// ==========================
-// CONFIGURACIÓN BASE
-// ==========================
-
-let activePositions = {};
-
-// Biblioteca oficial (ejemplo C Mayor posición 1)
-const chordLibrary = {
-  "C": {
-    tipo: "Mayor",
-    posiciones: [
-      {
-        numero: 1,
-        inversion: "Fundamental",
-        bajo: "C",
-        shape: "0-0|1-0|2-0|3-3|4-0"
-      }
-    ]
-  }
-};
-
-// ==========================
-// ACTIVAR TRASTE
-// ==========================
-
-function toggleNote(string, fret, element) {
-
-  // limpiar esa cuerda
-  document.querySelectorAll(`[data-string='${string}']`).forEach(el => {
-    el.classList.remove("active");
-  });
-
-  element.classList.add("active");
-  activePositions[string] = fret;
-
-  validateChord();
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f4f4f4;
 }
 
-// ==========================
-// GENERAR CÓDIGO DE FORMA
-// ==========================
-
-function generateShapeCode() {
-  let code = [];
-
-  for (let s = 0; s < 5; s++) {
-    let fret = activePositions[s] !== undefined ? activePositions[s] : 0;
-    code.push(s + "-" + fret);
-  }
-
-  return code.join("|");
+h1 {
+    margin-top: 20px;
 }
 
-// ==========================
-// VALIDAR CONTRA BIBLIOTECA
-// ==========================
-
-function validateChord() {
-
-  let resultDiv = document.getElementById("result");
-  if (!resultDiv) return;
-
-  let currentShape = generateShapeCode();
-
-  for (let chordName in chordLibrary) {
-
-    let chord = chordLibrary[chordName];
-
-    for (let pos of chord.posiciones) {
-
-      if (currentShape === pos.shape) {
-
-        resultDiv.innerHTML =
-          "<b>Acorde:</b> " + chordName + " " + chord.tipo +
-          "<br><b>Posición:</b> " + pos.numero +
-          "<br><b>Inversión:</b> " + pos.inversion;
-
-        return;
-      }
-    }
-  }
-
-  resultDiv.innerHTML = "No corresponde a biblioteca oficial";
+#fretboard {
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+    gap: 10px;
 }
 
-// ==========================
-// SONIDO
-// ==========================
-
-const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-const tuning = [7,0,4,9,4]; // G C E A E
-
-function getFrequency(noteIndex) {
-  return 440 * Math.pow(2, (noteIndex - 9) / 12);
+.string {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 6px;
 }
 
-function playChord() {
-
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-  for (let s = 0; s < 5; s++) {
-
-    let fret = activePositions[s] !== undefined ? activePositions[s] : 0;
-    let noteIndex = (tuning[s] + fret) % 12;
-    let frequency = getFrequency(noteIndex);
-
-    let osc = ctx.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.value = frequency;
-
-    let gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 1);
-  }
+.fret {
+    width: 35px;
+    height: 35px;
+    border: 1px solid #999;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
 }
 
-</script>
+.fret.active {
+    background: #2c3e50;
+    color: white;
+}
+
+button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 16px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Editor de Acordes - Charango</h1>
+
+<div id="fretboard"></div>
+
+<button onclick="playChord()">Escuchar acorde</button>
+
+<script src="app.js"></script>
+</body>
+</html>
