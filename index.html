@@ -1,176 +1,162 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Editor de Acordes de Charango</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f4f4f4; }
-    header { background: #2f5d50; color: white; padding: 12px; text-align: center; }
-    .container { padding: 12px; }
-    .charango { display: grid; grid-template-columns: repeat(19, 1fr); gap: 4px; overflow-x: auto; }
-    .cell { background: white; border: 1px solid #ccc; text-align: center; padding: 6px; font-size: 11px; cursor: pointer; }
-    .cell.active { background: #ffd966; border-color: #c9a400; }
-    .cell.barre { background: #b3d9ff; border-color: #2f5d50; }
-    .info { background: white; padding: 10px; border-radius: 6px; margin: 10px 0; }
-    input, button { padding: 8px; width: 100%; margin-top: 6px; }
-  </style>
-</head>
-<body>
-<header>
-  <h1>Editor de Acordes de Charango</h1>
-  <p>Constructor interactivo de posiciones reales</p>
-</header>
-
-<div class="container">
-  <div class="info">
-    <strong>Afinación estándar:</strong><br>
-    5ª G4 · 4ª C5 · 3ª E4/E5 (octavada) · 2ª A4 · 1ª E5
-  </div>
-
-  <div id="charango" class="charango"></div>
-
-  <div class="info">
-    <strong>Notas seleccionadas:</strong>
-    <ul id="selectedNotes"></ul>
-  </div>
-
-  <div class="info">
-    <input id="chordName" placeholder="Nombre del acorde" />
-    <button onclick="playChord()">Escuchar acorde</button>
-    <button onclick="saveChord()">Guardar acorde</button>
-  </div>
-
-  <div class="info">
-    <strong>Cejilla</strong>
-    <input type="number" id="barreFret" placeholder="Número de traste para cejilla (0-18)">
-    <button onclick="applyBarre()">Aplicar cejilla</button>
-    <button onclick="clearBarre()">Quitar cejilla</button>
-  </div>
-
-  <div class="info">
-    <strong>Acordes guardados</strong>
-    <pre id="saved"></pre>
-  </div>
-</div>
-
 <script>
-  const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-  const frets = 18;
 
-  const tuning = [
-    { name: 'G', freqs: [391.99] },
-    { name: 'C', freqs: [523.25] },
-    { name: 'E', freqs: [329.63, 659.25] },
-    { name: 'A', freqs: [440.00] },
-    { name: 'E', freqs: [659.25] }
-  ];
+// ============================
+// CONFIGURACIÓN BASE
+// ============================
 
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const selected = [];
-  const charangoDiv = document.getElementById('charango');
-  let barrePositions = [];
+let activePositions = {};
 
-  function noteAt(stringIndex, fret) {
-    const baseIndex = notes.indexOf(tuning[stringIndex].name);
-    return notes[(baseIndex + fret) % 12];
+// ============================
+// BIBLIOTECA OFICIAL (EJEMPLO C MAYOR)
+// REEMPLAZAR CON LAS FORMAS EXACTAS DEL LIBRO
+// ============================
+
+const chordLibrary = {
+
+  "C": {
+    tipo: "Mayor",
+    posiciones: [
+
+      {
+        numero: 1,
+        inversion: "Fundamental",
+        bajo: "C",
+        shape: "0-0|1-0|2-0|3-3|4-0"
+      },
+
+      {
+        numero: 2,
+        inversion: "1ra inversión",
+        bajo: "E",
+        shape: "0-3|1-3|2-4|3-5|4-3"
+      },
+
+      {
+        numero: 3,
+        inversion: "2da inversión",
+        bajo: "G",
+        shape: "0-8|1-8|2-7|3-8|4-X"
+      },
+
+      {
+        numero: 4,
+        inversion: "Octava superior",
+        bajo: "C",
+        shape: "0-12|1-12|2-12|3-12|4-X"
+      }
+
+    ]
   }
 
-  function freqsAt(stringIndex, fret) {
-    return tuning[stringIndex].freqs.map(f => f * Math.pow(2, fret / 12));
-  }
+};
 
-  tuning.forEach((string, s) => {
-    for (let f = 0; f <= frets; f++) {
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-      const note = noteAt(s, f);
-      cell.dataset.string = s;
-      cell.dataset.fret = f;
-      cell.innerHTML = `Ord ${5 - s}<br>T${f}<br>${note}`;
-      cell.onclick = () => toggleCell(cell, s, f, note);
-      charangoDiv.appendChild(cell);
-    }
+// ============================
+// ACTIVAR TRATES
+// ============================
+
+function toggleNote(string, fret, element){
+
+  // Limpiar esa cuerda
+  document.querySelectorAll(`.string-${string}`).forEach(el=>{
+    el.classList.remove("active");
   });
 
-  function toggleCell(cell, s, f, note) {
-    const idx = selected.findIndex(n => n.s === s && n.f === f);
-    if (idx >= 0) {
-      selected.splice(idx, 1);
-      cell.classList.remove('active');
+  element.classList.add("active");
+  activePositions[string] = fret;
+
+  validateChord();
+}
+
+// ============================
+// GENERAR CÓDIGO DE POSICIÓN
+// ============================
+
+function generateShapeCode(){
+
+  let code = [];
+
+  for(let s=0; s<5; s++){
+
+    if(activePositions[s] !== undefined){
+      code.push(`${s}-${activePositions[s]}`);
     } else {
-      selected.push({ s, f, note });
-      cell.classList.add('active');
-      playFreqs(freqsAt(s, f));
+      code.push(`${s}-0`);
     }
-    renderSelected();
+
   }
 
-  function applyBarre() {
-    clearBarre();
-    const fret = parseInt(document.getElementById('barreFret').value);
-    if (isNaN(fret) || fret < 0 || fret > frets) return;
+  return code.join("|");
+}
 
-    document.querySelectorAll('.cell').forEach(cell => {
-      if (parseInt(cell.dataset.fret) === fret) {
-        cell.classList.add('barre');
-        const s = parseInt(cell.dataset.string);
-        const note = noteAt(s, fret);
-        selected.push({ s, f: fret, note });
+// ============================
+// VALIDAR CONTRA BIBLIOTECA
+// ============================
+
+function validateChord(){
+
+  const currentShape = generateShapeCode();
+
+  for(let chordName in chordLibrary){
+
+    let chord = chordLibrary[chordName];
+
+    for(let pos of chord.posiciones){
+
+      if(currentShape === pos.shape){
+
+        document.getElementById("result").innerHTML = `
+          <b>Acorde:</b> ${chordName} ${chord.tipo}<br>
+          <b>Posición:</b> ${pos.numero}<br>
+          <b>Inversión:</b> ${pos.inversion}<br>
+          <b>Bajo:</b> ${pos.bajo}
+        `;
+
+        return;
       }
-    });
-    renderSelected();
+    }
   }
 
-  function clearBarre() {
-    document.querySelectorAll('.cell.barre').forEach(cell => {
-      cell.classList.remove('barre');
-    });
-    selected.splice(0, selected.length);
-    document.querySelectorAll('.cell.active').forEach(cell => cell.classList.remove('active'));
-    renderSelected();
-  }
+  document.getElementById("result").innerHTML =
+    "No corresponde a biblioteca oficial";
 
-  function renderSelected() {
-    const ul = document.getElementById('selectedNotes');
-    ul.innerHTML = '';
-    selected.forEach(n => {
-      const li = document.createElement('li');
-      li.textContent = `Orden ${5 - n.s}, traste ${n.f} → ${n.note}`;
-      ul.appendChild(li);
-    });
-  }
+}
 
-  function playFreqs(freqs) {
-    freqs.forEach(freq => {
-      const osc = audioCtx.createOscillator();
-      osc.type = 'triangle';
-      const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
-      osc.frequency.value = freq;
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.8);
-    });
-  }
+// ============================
+// SONIDO
+// ============================
 
-  function playChord() {
-    selected.forEach(n => playFreqs(freqsAt(n.s, n.f)));
-  }
+const noteNames = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
-  function saveChord() {
-    const name = document.getElementById('chordName').value || 'Sin nombre';
-    const data = { name, positions: selected };
-    const saved = JSON.parse(localStorage.getItem('charangoChords') || '[]');
-    saved.push(data);
-    localStorage.setItem('charangoChords', JSON.stringify(saved, null, 2));
-    document.getElementById('saved').textContent = JSON.stringify(saved, null, 2);
-    alert('Acorde guardado');
-  }
+const tuning = [7,0,4,9,4]; // G C E A E
 
-  document.getElementById('saved').textContent = localStorage.getItem('charangoChords') || '';
+function getFrequency(noteIndex){
+  return 440 * Math.pow(2, (noteIndex - 9)/12);
+}
+
+function playChord(){
+
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  for(let s=0; s<5; s++){
+
+    let fret = activePositions[s] ?? 0;
+    let noteIndex = (tuning[s] + fret) % 12;
+    let frequency = getFrequency(noteIndex);
+
+    let osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = frequency;
+
+    let gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 1);
+  }
+}
+
 </script>
-</body>
-</html>
