@@ -11,6 +11,7 @@
     .charango { display: grid; grid-template-columns: repeat(19, 1fr); gap: 4px; overflow-x: auto; }
     .cell { background: white; border: 1px solid #ccc; text-align: center; padding: 6px; font-size: 11px; cursor: pointer; }
     .cell.active { background: #ffd966; border-color: #c9a400; }
+    .cell.barre { background: #b3d9ff; border-color: #2f5d50; }
     .info { background: white; padding: 10px; border-radius: 6px; margin: 10px 0; }
     input, button { padding: 8px; width: 100%; margin-top: 6px; }
   </style>
@@ -41,6 +42,13 @@
   </div>
 
   <div class="info">
+    <strong>Cejilla</strong>
+    <input type="number" id="barreFret" placeholder="Número de traste para cejilla (0-18)">
+    <button onclick="applyBarre()">Aplicar cejilla</button>
+    <button onclick="clearBarre()">Quitar cejilla</button>
+  </div>
+
+  <div class="info">
     <strong>Acordes guardados</strong>
     <pre id="saved"></pre>
   </div>
@@ -53,7 +61,7 @@
   const tuning = [
     { name: 'G', freqs: [391.99] },
     { name: 'C', freqs: [523.25] },
-    { name: 'E', freqs: [329.63, 659.25] }, // 3ª cuerda octavada
+    { name: 'E', freqs: [329.63, 659.25] },
     { name: 'A', freqs: [440.00] },
     { name: 'E', freqs: [659.25] }
   ];
@@ -61,6 +69,7 @@
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const selected = [];
   const charangoDiv = document.getElementById('charango');
+  let barrePositions = [];
 
   function noteAt(stringIndex, fret) {
     const baseIndex = notes.indexOf(tuning[stringIndex].name);
@@ -76,6 +85,8 @@
       const cell = document.createElement('div');
       cell.className = 'cell';
       const note = noteAt(s, f);
+      cell.dataset.string = s;
+      cell.dataset.fret = f;
       cell.innerHTML = `Ord ${5 - s}<br>T${f}<br>${note}`;
       cell.onclick = () => toggleCell(cell, s, f, note);
       charangoDiv.appendChild(cell);
@@ -95,6 +106,31 @@
     renderSelected();
   }
 
+  function applyBarre() {
+    clearBarre();
+    const fret = parseInt(document.getElementById('barreFret').value);
+    if (isNaN(fret) || fret < 0 || fret > frets) return;
+
+    document.querySelectorAll('.cell').forEach(cell => {
+      if (parseInt(cell.dataset.fret) === fret) {
+        cell.classList.add('barre');
+        const s = parseInt(cell.dataset.string);
+        const note = noteAt(s, fret);
+        selected.push({ s, f: fret, note });
+      }
+    });
+    renderSelected();
+  }
+
+  function clearBarre() {
+    document.querySelectorAll('.cell.barre').forEach(cell => {
+      cell.classList.remove('barre');
+    });
+    selected.splice(0, selected.length);
+    document.querySelectorAll('.cell.active').forEach(cell => cell.classList.remove('active'));
+    renderSelected();
+  }
+
   function renderSelected() {
     const ul = document.getElementById('selectedNotes');
     ul.innerHTML = '';
@@ -108,11 +144,15 @@
   function playFreqs(freqs) {
     freqs.forEach(freq => {
       const osc = audioCtx.createOscillator();
-      osc.type = 'sine';
+      osc.type = 'triangle';
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
       osc.frequency.value = freq;
-      osc.connect(audioCtx.destination);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.6);
+      osc.stop(audioCtx.currentTime + 0.8);
     });
   }
 
